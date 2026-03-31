@@ -1,0 +1,42 @@
+# pyproject.toml
+#
+# This file defines our package for pip installation.
+# It lets users install the CLIENT for our environment with:
+#   pip install git+https://huggingface.co/spaces/YOUR_HF_USERNAME/email-triage-env
+#
+# After installing, they can do:
+#   from email_triage_env import EmailTriageEnv, EmailAction
+#
+# The server-side dependencies (fastapi, uvicorn) are in server/requirements.txt.
+# The client only needs openenv-core.
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "email-triage-env"
+version = "1.0.0"
+description = "An OpenEnv environment for email triage — classify, prioritize, and reply to emails."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    # The client only needs the OpenEnv core package
+    "openenv-core>=0.2.1",
+]
+
+[project.optional-dependencies]
+# Install with: pip install email-triage-env[dev]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "openai>=1.0",          # for running baseline_inference.py
+    "httpx>=0.24",          # for testing the HTTP endpoints
+]
+
+[tool.setuptools.packages.find]
+# Tell setuptools to find our package in the current directory
+where = ["."]
+include = ["email_triage_env*"]
