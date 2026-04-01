@@ -52,5 +52,5 @@ server:
 # Fill these in after you run the baseline script.
 baseline_scores:
   classify: 0.837 # update after running baseline_inference.py
-  prioritize: 0.892
-  reply: 0.651
+  prioritize: 0.74
+  reply: 0.671
