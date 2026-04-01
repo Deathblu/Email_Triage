@@ -15,7 +15,7 @@ from openai import OpenAI
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1")
 MODEL_NAME   = os.environ.get("MODEL_NAME", "llama-3.1-8b-instant")
-HF_TOKEN     = os.environ.get("HF_TOKEN", "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")
+HF_TOKEN     = os.environ.get("HF_TOKEN", "groq_token")
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "https://Deathblue1306-email-triage-env.hf.space")
 
 EPISODES_PER_TASK = 3
