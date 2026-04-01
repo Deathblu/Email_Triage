@@ -23,11 +23,11 @@ The agent receives a simulated inbox of 5 emails per episode. Each email is draw
 
 **Three tasks of increasing difficulty:**
 
-| Task | Difficulty | What the agent must do | Reward |
-|---|---|---|---|
-| `classify` | Easy | Label each email: `urgent`, `normal`, or `spam` | 1.0 = correct, 0.0 = wrong |
-| `prioritize` | Medium | Classify + assign priority 1-5 | 0.5 category + 0.5 priority proximity |
-| `reply` | Hard | Classify + prioritize + write a reply | 0.4 + 0.2 + 0.4 reply quality |
+| Task         | Difficulty | What the agent must do                          | Reward                                |
+| ------------ | ---------- | ----------------------------------------------- | ------------------------------------- |
+| `classify`   | Easy       | Label each email: `urgent`, `normal`, or `spam` | 1.0 = correct, 0.0 = wrong            |
+| `prioritize` | Medium     | Classify + assign priority 1-5                  | 0.5 category + 0.5 priority proximity |
+| `reply`      | Hard       | Classify + prioritize + write a reply           | 0.4 + 0.2 + 0.4 reply quality         |
 
 Rewards are always in **[0.0, 1.0]** and give partial credit — the agent gets something for being close even when not perfect.
 
@@ -38,19 +38,28 @@ Rewards are always in **[0.0, 1.0]** and give partial credit — the agent gets 
 ### Connect to the live HF Space
 
 ```python
-from email_triage_env import EmailTriageEnv, EmailAction
+import urllib.request, json
 
-with EmailTriageEnv(base_url="https://YOUR_HF_USERNAME-email-triage-env.hf.space").sync() as env:
-    obs = env.reset()
-    print(obs.current_email.subject)   # "URGENT: Production server down"
+# Reset
+req = urllib.request.Request(
+    "https://Deathblue1306-email-triage-env.hf.space/reset",
+    data=b"{}",
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+obs = json.loads(urllib.request.urlopen(req).read().decode())
+print(obs["observation"]["current_email"]["subject"])
 
-    result = env.step(EmailAction(
-        category="urgent",
-        priority=1,
-        reply="On it — joining the incident bridge now."
-    ))
-    print(result.reward)    # e.g. 0.923
-    print(result.observation.feedback)
+# Step
+data = json.dumps({"action": {"category": "urgent", "priority": 1, "reply": "On it."}}).encode()
+req = urllib.request.Request(
+    "https://Deathblue1306-email-triage-env.hf.space/step",
+    data=data,
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+result = json.loads(urllib.request.urlopen(req).read().decode())
+print(result["reward"])
 ```
 
 ### Run locally with Docker
@@ -61,30 +70,30 @@ docker build -t email-triage-env -f server/Dockerfile .
 
 # Run the server
 docker run -p 7860:7860 email-triage-env
-
-# Connect to it
-python -c "
-from email_triage_env import EmailTriageEnv, EmailAction
-with EmailTriageEnv(base_url='http://localhost:7860').sync() as env:
-    obs = env.reset()
-    print(obs.current_email.subject)
-"
 ```
 
-### Run the baseline
+### Run the baseline inference script
+
+The baseline uses the OpenAI client pointed at any OpenAI-compatible endpoint.
+We used [Groq](https://console.groq.com) (free, no billing needed) with `llama-3.1-8b-instant`.
 
 ```bash
-export OPENAI_API_KEY="sk-..."
-export ENV_BASE_URL="http://localhost:7860"
-python baseline_inference.py
+# Required environment variables
+set API_BASE_URL=https://api.groq.com/openai/v1
+set MODEL_NAME=llama-3.1-8b-instant
+set HF_TOKEN=gsk_YOUR_GROQ_KEY
+set ENV_BASE_URL=https://Deathblue1306-email-triage-env.hf.space
+
+python inference.py
 ```
+
+The script uses the official OpenAI Python client (`from openai import OpenAI`) with `base_url=API_BASE_URL` — compatible with OpenAI, Groq, Gemini, or any OpenAI-compatible endpoint.
 
 ---
 
 ## Action space
 
 ```python
-@dataclass
 class EmailAction(Action):
     category: str    # "urgent" | "normal" | "spam"
     priority: int    # 1 (most urgent) to 5 (least urgent), default 3
@@ -94,14 +103,13 @@ class EmailAction(Action):
 ## Observation space
 
 ```python
-@dataclass
 class EmailObservation(Observation):
     current_email: Email          # the email to process
     next_email_subject: str       # preview of what's coming next
     feedback: str                 # how the last action was graded
     emails_remaining: int         # how many emails are left
-    done: bool                    # True when inbox is empty
-    reward: float                 # reward for the last action
+    done: bool                    # True when inbox is empty (inherited)
+    reward: float                 # reward for the last action (inherited)
 ```
 
 ---
@@ -109,18 +117,17 @@ class EmailObservation(Observation):
 ## Project structure
 
 ```
-email_triage_env/
-├── __init__.py               # Package exports
+Email_Triage/
 ├── models.py                 # Action, Observation, State definitions
-├── client.py                 # EmailTriageEnv client
-├── baseline_inference.py     # LLM baseline script
+├── client.py                 # EmailTriageEnv HTTP client
+├── inference.py              # LLM baseline script (OpenAI client)
 ├── openenv.yaml              # Environment manifest
 ├── pyproject.toml            # Package config
 ├── README.md                 # This file
 └── server/
     ├── __init__.py
     ├── email_environment.py  # Core logic: reset(), step(), state(), graders
-    ├── app.py                # FastAPI wiring (5 lines)
+    ├── app.py                # FastAPI wiring
     ├── Dockerfile            # Container definition
     └── requirements.txt      # Server dependencies
 ```
@@ -139,30 +146,16 @@ The reward function gives **partial credit** throughout the trajectory, not just
 
 ## Baseline scores
 
-| Task | Model | Score (avg over 3 episodes) |
-|---|---|---|
-| classify | gpt-4o-mini | — |
-| prioritize | gpt-4o-mini | — |
-| reply | gpt-4o-mini | — |
+Baseline agent: `llama-3.1-8b-instant` via Groq, using the OpenAI client with `base_url=https://api.groq.com/openai/v1`.
 
-*Run `baseline_inference.py` to populate these.*
+| Task       | Model                | Score (avg over 3 episodes) |
+| ---------- | -------------------- | --------------------------- |
+| classify   | llama-3.1-8b-instant | 0.837                       |
+| prioritize | llama-3.1-8b-instant | 0.892                       |
+| reply      | llama-3.1-8b-instant | 0.651                       |
 
 ---
 
-## Setup & installation
+## HF Space
 
-```bash
-# Install client
-pip install git+https://huggingface.co/spaces/YOUR_HF_USERNAME/email-triage-env
-
-# Install with dev deps (for running baseline)
-pip install "email-triage-env[dev] @ git+https://huggingface.co/spaces/YOUR_HF_USERNAME/email-triage-env"
-```
-
-## Deploy to HF Spaces
-
-```bash
-pip install openenv-core huggingface_hub
-huggingface-cli login
-openenv push --repo-id YOUR_HF_USERNAME/email-triage-env
-```
+Live at: [https://huggingface.co/spaces/Deathblue1306/email-triage-env](https://huggingface.co/spaces/Deathblue1306/email-triage-env)

@@ -15,3 +15,10 @@ _env_instance = EmailTriageEnvironment()
 # Pass a factory that always returns the SAME instance
 # This way reset() and step() share the same inbox state
 app = create_app(lambda: _env_instance, EmailAction, EmailObservation)
+
+def main():
+    import uvicorn
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7680)
+
+if __name__ == "__main__":
+    main()

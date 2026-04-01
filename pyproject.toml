@@ -2,7 +2,7 @@
 #
 # This file defines our package for pip installation.
 # It lets users install the CLIENT for our environment with:
-#   pip install git+https://huggingface.co/spaces/YOUR_HF_USERNAME/email-triage-env
+#   pip install git+https://huggingface.co/spaces/Deathblue1306/email-triage-env
 #
 # After installing, they can do:
 #   from email_triage_env import EmailTriageEnv, EmailAction
@@ -40,3 +40,6 @@ dev = [
 # Tell setuptools to find our package in the current directory
 where = ["."]
 include = ["email_triage_env*"]
+
+[project.scripts]
+server = "server.app:main"
