@@ -1,6 +1,6 @@
 from huggingface_hub import HfApi,login 
 
-login(token="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")
+login(token="")
 api = HfApi()
 api.upload_file(
     path_or_fileobj='inference.py',
