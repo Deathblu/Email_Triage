@@ -51,6 +51,6 @@ server:
 # Baseline scores achieved by the GPT-4o baseline in baseline_inference.py
 # Fill these in after you run the baseline script.
 baseline_scores:
-  classify:    0.0   # update after running baseline_inference.py
-  prioritize:  0.0
-  reply:       0.0
+  classify: 0.837 # update after running baseline_inference.py
+  prioritize: 0.892
+  reply: 0.651
