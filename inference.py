@@ -15,11 +15,11 @@ from openai import OpenAI
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1")
 MODEL_NAME   = os.environ.get("MODEL_NAME", "llama-3.1-8b-instant")
-HF_TOKEN     = os.environ.get("HF_TOKEN", "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")
+HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "https://Deathblue1306-email-triage-env.hf.space")
 
 EPISODES_PER_TASK = 3
-TASKS = ["classify", "prioritize", "reply"]
+TASKS = ["classify", "prioritize", "reply", "escalate"]
 
 
 # ---------------------------------------------------------------------------
@@ -36,9 +36,15 @@ def env_reset():
     return json.loads(urllib.request.urlopen(req, timeout=30).read().decode())
 
 
-def env_step(category: str, priority: int, reply: str):
+def env_step(category: str, priority: int, reply: str, routing: str = "handle", team: str = "none"):
     data = json.dumps({
-        "action": {"category": category, "priority": priority, "reply": reply}
+        "action": {
+            "category": category,
+            "priority": priority,
+            "reply": reply,
+            "routing": routing,
+            "team": team,
+        }
     }).encode()
     req = urllib.request.Request(
         f"{ENV_BASE_URL}/step",
@@ -72,6 +78,14 @@ def build_prompt(email: dict, task_id: str) -> str:
             "For spam, leave reply empty.\n"
             "Respond ONLY with valid JSON: {\"category\": \"...\", \"priority\": <1-5>, \"reply\": \"...\"}"
         ),
+        "escalate": (
+            "Decide how to route this email. Choose routing from: handle, escalate_manager, escalate_team, archive.\n"
+            "If routing is escalate_team, also pick a team from: engineering, legal, finance, hr.\n"
+            "Otherwise set team to none.\n"
+            "Rules: archive = spam/irrelevant. escalate_manager = needs executive awareness. "
+            "escalate_team = needs a specific team. handle = you can deal with it yourself.\n"
+            "Respond ONLY with valid JSON: {\"routing\": \"...\", \"team\": \"...\"}"
+        ),
     }
     return f"""You are an email triage assistant.
 
@@ -97,10 +111,12 @@ def parse_response(text: str, task_id: str):
             "category": str(data.get("category", "normal")).lower().strip(),
             "priority": int(data.get("priority", 3)),
             "reply":    str(data.get("reply", "")),
+            "routing":  str(data.get("routing", "handle")).lower().strip(),
+            "team":     str(data.get("team", "none")).lower().strip(),
         }
     except Exception:
         print(f"    [warn] parse failed: {text[:80]}")
-        return {"category": "normal", "priority": 3, "reply": ""}
+        return {"category": "normal", "priority": 3, "reply": "", "routing": "handle", "team": "none"}
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +145,10 @@ def run_episode(llm_client, task_id: str) -> float:
         )
         action = parse_response(response.choices[0].message.content, task_id)
 
-        result = env_step(action["category"], action["priority"], action["reply"])
+        result = env_step(
+            action["category"], action["priority"], action["reply"],
+            action.get("routing", "handle"), action.get("team", "none")
+        )
         reward = result.get("reward") or 0.0
         total_reward += reward
         step += 1
