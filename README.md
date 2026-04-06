@@ -1,3 +1,14 @@
+---
+title: Email Triage Env
+emoji: 📧
+colorFrom: blue
+colorTo: purple
+sdk: docker
+tags:
+  - openenv
+pinned: false
+---
+
 # EmailTriageEnv
 
 An [OpenEnv](https://github.com/meta-pytorch/OpenEnv) environment where AI agents learn to triage a realistic email inbox — classifying urgency, prioritizing workload, drafting professional replies, and making routing decisions.
@@ -69,7 +80,7 @@ Rewards correct routing decisions with partial credit for near-misses. Hard pena
 ```python
 import urllib.request, json
 
-# Reset
+# Reset — start a new episode
 req = urllib.request.Request(
     "https://Deathblue1306-email-triage-env.hf.space/reset",
     data=b"{}",
@@ -77,10 +88,17 @@ req = urllib.request.Request(
     method="POST",
 )
 obs = json.loads(urllib.request.urlopen(req).read().decode())
+print(obs["observation"]["task_id"])            # which task this episode
 print(obs["observation"]["current_email"]["subject"])
 
-# Step
-data = json.dumps({"action": {"category": "urgent", "priority": 1, "reply": "On it."}}).encode()
+# Step — send an action
+data = json.dumps({"action": {
+    "category": "urgent",
+    "priority": 1,
+    "reply": "On it — joining the incident bridge now.",
+    "routing": "escalate_team",
+    "team": "engineering"
+}}).encode()
 req = urllib.request.Request(
     "https://Deathblue1306-email-triage-env.hf.space/step",
     data=data,
@@ -89,6 +107,7 @@ req = urllib.request.Request(
 )
 result = json.loads(urllib.request.urlopen(req).read().decode())
 print(result["reward"])
+print(result["observation"]["feedback"])
 ```
 
 ### Run locally with Docker
@@ -98,13 +117,17 @@ docker build -t email-triage-env -f server/Dockerfile .
 docker run -p 7860:7860 email-triage-env
 ```
 
-### Run the baseline
+### Run the baseline inference script
 
 ```bash
-export OPENAI_API_KEY="sk-..."
-export ENV_BASE_URL="http://localhost:7860"
-python baseline_inference.py
+set API_BASE_URL=https://api.groq.com/openai/v1
+set MODEL_NAME=llama-3.1-8b-instant
+set HF_TOKEN=gsk_YOUR_GROQ_KEY
+set ENV_BASE_URL=https://Deathblue1306-email-triage-env.hf.space
+python inference.py
 ```
+
+Uses the official OpenAI Python client with `base_url=API_BASE_URL` — compatible with OpenAI, Groq, Gemini, or any OpenAI-compatible endpoint.
 
 ---
 
@@ -123,31 +146,33 @@ class EmailAction(Action):
 
 ```python
 class EmailObservation(Observation):
-    current_email: Email          # the email to process
-    next_email_subject: str       # preview of what's coming next
-    feedback: str                 # how the last action was graded
-    emails_remaining: int         # how many emails are left
+    current_email: PublicEmail    # email to process (ground truth labels hidden)
+    next_email_subject: str       # subject preview of next email
+    feedback: str                 # grader feedback on last action
+    emails_remaining: int         # emails left in inbox
+    task_id: str                  # active task: classify/prioritize/reply/escalate
     done: bool                    # True when inbox is empty (inherited)
-    reward: float                 # reward for the last action (inherited)
+    reward: float                 # reward for last action (inherited)
 ```
+
+Ground truth labels (`true_category`, `true_priority`, `true_routing`, `true_team`) are never exposed to the agent — only the grader sees them.
 
 ---
 
 ## Project structure
 
 ```
-email_triage_env/
-├── __init__.py               # Package exports
-├── models.py                 # Action, Observation, State definitions
-├── client.py                 # EmailTriageEnv client
-├── baseline_inference.py     # LLM baseline script
+Email_Triage/
+├── models.py                 # Action, Observation, State, PublicEmail definitions
+├── client.py                 # EmailTriageEnv HTTP client
+├── inference.py              # LLM baseline script (OpenAI client)
 ├── openenv.yaml              # Environment manifest
 ├── pyproject.toml            # Package config
 ├── README.md                 # This file
 └── server/
     ├── __init__.py
-    ├── email_environment.py  # Core logic: reset(), step(), state(), graders
-    ├── app.py                # FastAPI wiring (5 lines)
+    ├── email_environment.py  # Core logic: reset(), step(), state(), all 4 graders
+    ├── app.py                # FastAPI wiring
     ├── Dockerfile            # Container definition
     └── requirements.txt      # Server dependencies
 ```
@@ -156,15 +181,14 @@ email_triage_env/
 
 ## Baseline scores
 
-Baseline agent: `llama-3.1-8b-instant` via Groq, using the OpenAI client with `base_url=https://api.groq.com/openai/v1`.
+Baseline agent: `llama-3.1-8b-instant` via Groq, using the OpenAI Python client.
 
-| Task       | Model       | Score (avg over 3 episodes) |
-| ---------- | ----------- | --------------------------- |
-| classify   | gpt-4o-mini | —                           |
-| prioritize | gpt-4o-mini | —                           |
-| reply      | gpt-4o-mini | —                           |
-
-_Run `baseline_inference.py` to populate these._
+| Task       | Model                | Score (avg over 3 episodes) |
+| ---------- | -------------------- | --------------------------- |
+| classify   | llama-3.1-8b-instant | 0.772                       |
+| prioritize | llama-3.1-8b-instant | 0.667                       |
+| reply      | llama-3.1-8b-instant | 0.678                       |
+| escalate   | llama-3.1-8b-instant | 0.489                       |
 
 ---
 
