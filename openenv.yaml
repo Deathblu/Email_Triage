@@ -1,9 +1,4 @@
 # openenv.yaml
-#
-# This file is the "identity card" for your OpenEnv environment.
-# The OpenEnv CLI reads this when you run `openenv push`.
-# Hugging Face uses the `tags` field to list your environment in the catalog.
-# The hackathon grader uses `tasks` to know what to evaluate.
 
 name: email-triage-env
 version: "1.0.0"
@@ -12,17 +7,14 @@ description: >
   prioritize workload, and draft professional replies. Three tasks of
   increasing difficulty test the agent's real-world email handling skills.
 
-# The `openenv` tag is REQUIRED — it marks this as an OpenEnv environment
-# on Hugging Face Spaces so it appears in the catalog.
 tags:
   - openenv
   - email
   - triage
   - nlp
 
-# The three tasks — must match what your environment actually implements.
-# difficulty: easy | medium | hard
-# The grader uses these IDs to set self._task_id before calling reset().
+# The four tasks — must match what your environment actually implements.
+
 tasks:
   - id: classify
     description: "Classify each email as urgent, normal, or spam."
@@ -42,6 +34,12 @@ tasks:
     reward_range: [0.0, 1.0]
     max_steps: 5
 
+  - id: escalate
+    description: "Decide how to route each email: handle, escalate to manager, escalate to a team, or archive."
+    difficulty: hard
+    reward_range: [0.0, 1.0]
+    max_steps: 5
+
 # The server entry point (used by openenv push to know what to run)
 server:
   module: server.app
@@ -49,8 +47,8 @@ server:
   port: 7860
 
 # Baseline scores achieved by the GPT-4o baseline in baseline_inference.py
-# Fill these in after you run the baseline script.
 baseline_scores:
-  classify: 0.837 # update after running baseline_inference.py
-  prioritize: 0.74
-  reply: 0.671
+  classify: 0.772
+  prioritize: 0.667
+  reply: 0.678
+  escalate: 0.489
