@@ -48,7 +48,7 @@ server:
 
 # Baseline scores achieved by the GPT-4o baseline in baseline_inference.py
 baseline_scores:
-  classify: 0.772
-  prioritize: 0.667
-  reply: 0.678
-  escalate: 0.489
+  classify: 0.715
+  prioritize: 0.618
+  reply: 0.562
+  escalate: 0.633
